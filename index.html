@@ -1,0 +1,568 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>RE:SEARCH 尋蛋大作戰 - YMCAHK The Beacon</title>
+    
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <script src="https://unpkg.com/html5-qrcode"></script>
+
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700;900&display=swap');
+        body { font-family: 'Noto Sans TC', sans-serif; }
+        .animate-in { animation: fadeIn 0.4s ease-out; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        .bg-mesh {
+            background-color: #fffaf5;
+            background-image: radial-gradient(at 0% 0%, hsla(28,100%,95%,1) 0, transparent 50%), 
+                              radial-gradient(at 50% 0%, hsla(11,100%,93%,1) 0, transparent 50%);
+        }
+        /* 修正掃描器比例 */
+        #qr-reader {
+            width: 100% !important;
+            border: none !important;
+        }
+        #qr-reader__scan_region {
+            background: black !important;
+        }
+        #qr-reader video {
+            object-fit: cover !important;
+            aspect-ratio: 1/1 !important;
+        }
+    </style>
+</head>
+<body class="bg-mesh">
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect, useRef } = React;
+
+        const App = () => {
+            const taskData = {
+                1: {
+                    question: "你而家面向嘅方向，正正係長沙灣嘅核心地帶。但你有冇諗過，到底「長沙灣」呢個名係點樣嚟嘅呢？",
+                    options: {
+                        A: "呢度原本係海灣上嘅淺灘，綿長而彎曲",
+                        B: "舊時村民最愛比賽畫「長長嘅沙畫」",
+                        C: "古時呢帶出產嘅椰絲包大受歡迎，椰絲好似細沙咁，所以叫長沙",
+                        D: "當地村落嘅村民大多數都係姓「長」或者姓「沙」"
+                    },
+                    correct: 'A',
+                    hint: "香港好多土地都係填海而得返嚟，「長沙灣」都唔例外呢！",
+                    explanation: "答啱咗！長沙灣嘅名來自昔日一條長約 2 公里嘅狹長沙灘。隨著多年嚟嘅填海工程，海岸線向南推移，昔日嘅沙灘就變成咗今日你見到嘅建築群喇。"
+                },
+                2: {
+                    question: "有冇發現你面前嘅「興華街」，比起其他街道特別闊呢？除咗行車之外，其實你腳底下面仲隱藏住啲嘢：",
+                    options: {
+                        A: "通往昂船洲軍營嘅秘密地道",
+                        B: "一條被覆蓋咗嘅巨大明渠",
+                        C: "二戰時期遺留落嚟嘅防空洞系統",
+                        D: "準備用嚟興建深水埗最大型地底商場嘅預留位"
+                    },
+                    correct: 'B',
+                    hint: "落大雨嘅時候，我哋正正需要呢啲設施，去確保雨水能夠迅速排出大海。",
+                    explanation: "冇錯！興華街下方其實係一條大型明渠。喺城市規劃入面，呢類覆蓋明渠嘅地帶通常會變為休憩處，因為層板嘅承托力不足以支撐高樓大廈。"
+                },
+                3: {
+                    question: "對面就係歷史悠久嘅蘇屋邨。如果你細心觀察每一座樓宇嘅名，你會發現佢哋嘅命名主題其實係：",
+                    options: {
+                        A: "全部都係以屋邨名開首嘅「蘇」字命名",
+                        B: "不同季節盛開嘅花卉",
+                        C: "價值連城嘅珍貴木材",
+                        D: "呢區昔日盛產嘅水果"
+                    },
+                    correct: 'B',
+                    hint: "百合樓、彩鵑樓、劍蘭樓... 你覺得呢啲名係代表緊啲乜嘢？",
+                    explanation: "醒目！蘇屋邨各座樓宇都係以花卉命名（例如：櫻桃樓、蘭花樓等），呢種命名方式喺 1960 年代嘅公屋規劃入面係非常優雅且具前瞻性嘅設計，令社區充滿生機。"
+                },
+                4: {
+                    question: "雖然長沙灣而家周圍都係高樓大廈，但每日凌晨時分，依然會有大量「農產品」集結喺呢區。請問邊一類批發市場到今日仲保留喺長沙灣？",
+                    options: {
+                        A: "水果批發市場",
+                        B: "蔬菜批發市場",
+                        C: "大米批發市場",
+                        D: "屠宰場同牲畜檢疫站"
+                    },
+                    correct: 'B',
+                    hint: "呢個地方係香港餐桌嘅「綠色心臟」。如果你半夜經過，會見到好多菜籮匯集於此。",
+                    explanation: "答啱喇！位於荔枝角道嘅「長沙灣蔬菜批發市場」，係香港現時規模最大嘅蔬菜批發中心，亦係長沙灣保留農業商業色彩嘅重要標記。"
+                },
+                5: {
+                    question: "喺深水埗同長沙灣，有一條街喺仲未有「屯門公路」嘅古代，就已經係連接九龍同新界西嘅「唯一大動脈」。呢條街係：",
+                    options: {
+                        A: "興華街",
+                        B: "順寧道",
+                        C: "青山道",
+                        D: "保安道"
+                    },
+                    correct: 'C',
+                    hint: "呢條路係以屯門嘅舊稱嚟命名嘅。",
+                    explanation: "啱喇！青山道係香港最長嘅街道之一，歷史非常悠久。喺未有現代公路前，佢係貫穿九龍核心至元朗、屯門嘅主要陸路。沿路仲可以見到少量戰前傳樓，非常有特色。"
+                },
+                6: {
+                    question: "喺呢區搭地鐵，如果完全跟住個「站名」去行，分分鐘會行冤枉路！如果喺長沙灣站落車，可以去到以下邊一個「長沙灣」地標呢？",
+                    options: {
+                        A: "長沙灣邨",
+                        B: "長沙灣廣場",
+                        C: "長沙灣政府合署",
+                        D: "長沙灣分區警署"
+                    },
+                    correct: 'A',
+                    hint: "小編間中都會喺長沙灣站撞見住喺長沙灣邨嘅街坊㗎！",
+                    explanation: "答啱喇！因為當年地鐵命名同實際地理位置有落差，所以區內嘅站名經常令人混淆。長沙灣廣場同長沙灣分區警署實際上係位於長沙灣嘅核心區，但比較接近荔枝角站。至於長沙灣政府合署，當中嘅「長沙灣」其實係代表「長沙灣道」，實際上近深水埗站多啲㗎。記住下次唔好行錯路喇！"
+                }
+            };
+
+            const taskCodes = { 1: 'A7B2', 2: 'K9X4', 3: 'P3M8', 4: 'R5W1', 5: 'E2T6', 6: 'H8N3' };
+            const STAFF_PASSCODE = "HELP88";
+            const COOLDOWN_SECONDS = 10; 
+
+            const [gameState, setGameState] = useState('list'); 
+            const [userData, setUserData] = useState(() => {
+                const saved = localStorage.getItem('beacon_user_data');
+                return saved ? JSON.parse(saved) : { name: '', email: '', whatsapp: '', agreed: false };
+            });
+            const [contactMethod, setContactMethod] = useState('email');
+            const [userAnswers, setUserAnswers] = useState(() => JSON.parse(localStorage.getItem('beacon_answers')) || {});
+            const [powerUps, setPowerUps] = useState(() => JSON.parse(localStorage.getItem('beacon_powerups')) || { used5050: false, usedHint: false });
+            const [active5050, setActive5050] = useState([]); 
+            const [showHintModal, setShowHintModal] = useState(false);
+            const [activeTaskId, setActiveTaskId] = useState(null);
+            const [manualCode, setManualCode] = useState('');
+            const [manualCodeError, setManualCodeError] = useState('');
+            const [uniqueId, setUniqueId] = useState('');
+            const [formError, setFormError] = useState('');
+            const [currentTime, setCurrentTime] = useState(new Date());
+            
+            const [feedback, setFeedback] = useState(null); 
+            const [cooldown, setCooldown] = useState(0);
+            const [wrongOptions, setWrongOptions] = useState([]);
+            const [attempts, setAttempts] = useState(() => JSON.parse(localStorage.getItem('beacon_attempts')) || {});
+            const [staffCodeInput, setStaffCodeInput] = useState('');
+            const [staffError, setStaffError] = useState('');
+            const [isScanning, setIsScanning] = useState(false);
+            const [cameraError, setCameraError] = useState(null);
+            const scannerRef = useRef(null);
+
+            useEffect(() => {
+                let savedId = localStorage.getItem('beacon_quest_user_id_v2');
+                if (!savedId) {
+                    savedId = `${Math.floor(100000 + Math.random() * 900000)}`;
+                    localStorage.setItem('beacon_quest_user_id_v2', savedId);
+                }
+                setUniqueId(savedId);
+                if (userData.agreed && userData.name && Object.keys(userAnswers).length === 6) {
+                    setGameState('result');
+                }
+            }, []);
+
+            useEffect(() => {
+                const timer = setInterval(() => setCurrentTime(new Date()), 1000);
+                return () => clearInterval(timer);
+            }, []);
+
+            useEffect(() => {
+                if (window.lucide) window.lucide.createIcons();
+            }, [gameState, feedback, showHintModal, isScanning, contactMethod]);
+
+            useEffect(() => {
+                let html5QrCode = null;
+                if (gameState === 'scan' && isScanning && window.Html5Qrcode) {
+                    const startScanner = async () => {
+                        setCameraError(null);
+                        try {
+                            html5QrCode = new window.Html5Qrcode("qr-reader");
+                            scannerRef.current = html5QrCode;
+                            await html5QrCode.start(
+                                { facingMode: "environment" },
+                                { fps: 10, qrbox: { width: 250, height: 250 } },
+                                (decodedText) => handleCodeSuccess(decodedText.toUpperCase()),
+                                () => {} 
+                            );
+                        } catch (err) {
+                            setCameraError("無法啟動相機。請檢查權限設置或手動輸入。");
+                            setIsScanning(false);
+                        }
+                    };
+                    startScanner();
+                }
+                return () => {
+                    if (html5QrCode && html5QrCode.isScanning) {
+                        html5QrCode.stop().catch(() => {});
+                    }
+                };
+            }, [gameState, isScanning]);
+
+            const handleCodeSuccess = (code) => {
+                const tid = Object.keys(taskCodes).find(k => taskCodes[k] === code.trim());
+                if (tid) {
+                    setManualCodeError('');
+                    if (scannerRef.current && scannerRef.current.isScanning) {
+                        scannerRef.current.stop().then(() => startQuiz(tid)).catch(() => startQuiz(tid));
+                    } else {
+                        startQuiz(tid);
+                    }
+                } else {
+                    setManualCodeError('QR 碼無效');
+                }
+            };
+
+            const startQuiz = (tid) => {
+                setActiveTaskId(tid);
+                setGameState('quiz');
+                setFeedback(null);
+                setCooldown(0);
+                setWrongOptions([]);
+                setActive5050([]);
+                setManualCode('');
+                setManualCodeError('');
+                setIsScanning(false);
+            };
+
+            const handleAnswer = (option) => {
+                const currentTask = taskData[activeTaskId];
+                const isCorrect = option === currentTask.correct;
+                
+                const taskAttempts = (attempts[activeTaskId] || 0) + 1;
+                const newAttempts = { ...attempts, [activeTaskId]: taskAttempts };
+                setAttempts(newAttempts);
+                localStorage.setItem('beacon_attempts', JSON.stringify(newAttempts));
+
+                if (isCorrect) {
+                    setFeedback('success');
+                } else {
+                    setWrongOptions(prev => [...prev, option]);
+                    if (taskAttempts === 1) {
+                        setCooldown(COOLDOWN_SECONDS);
+                        const timer = setInterval(() => {
+                            setCooldown(c => {
+                                if (c <= 1) { clearInterval(timer); return 0; }
+                                return c - 1;
+                            });
+                        }, 1000);
+                    } else {
+                        setFeedback('error');
+                    }
+                }
+            };
+
+            const handleExplanationConfirm = () => {
+                const newAns = { ...userAnswers, [activeTaskId]: true };
+                setUserAnswers(newAns);
+                localStorage.setItem('beacon_answers', JSON.stringify(newAns));
+                setGameState('list');
+            };
+
+            const handleStaffUnlock = () => {
+                if (staffCodeInput.toUpperCase() === STAFF_PASSCODE) {
+                    const newAttempts = { ...attempts, [activeTaskId]: 0 };
+                    setAttempts(newAttempts);
+                    localStorage.setItem('beacon_attempts', JSON.stringify(newAttempts));
+                    setFeedback(null); setStaffCodeInput(''); setStaffError('');
+                } else {
+                    setStaffError('授權碼錯誤！');
+                }
+            };
+
+const handleFinalRegistration = async (e) => {
+    e.preventDefault();
+    setFormError('');
+    
+    // 驗證邏輯 (保留你原本的)
+    if (!userData.name.trim()) { setFormError("請輸入姓名"); return; }
+    let contactValue = contactMethod === 'email' ? userData.email : userData.whatsapp;
+    if (contactMethod === 'email' && (!userData.email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(userData.email))) { setFormError("請輸入有效電郵"); return; }
+    if (contactMethod === 'whatsapp' && (!userData.whatsapp || userData.whatsapp.length < 8)) { setFormError("請輸入正確電話"); return; }
+    if (!userData.agreed) { setFormError("請同意條款"); return; }
+
+    // --- 新增：傳送資料到 Google Sheet ---
+    const GOOGLE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbyS2APVR5UG7hlaGt3fMbKbc9TWavq2N4v5Nfmqfxi4YMEuUdYa3U0PDHO2iwte2tD3pA/exec'; 
+
+    try {
+        setGameState('loading'); // 你可以加一個加載狀態
+        await fetch(GOOGLE_SCRIPT_URL, {
+            method: 'POST',
+            mode: 'no-cors', // 重要：避免跨域報錯
+            cache: 'no-cache',
+            body: JSON.stringify({
+                uniqueId: uniqueId,
+                name: userData.name,
+                contactMethod: contactMethod,
+                contactValue: contactValue
+            })
+        });
+        
+        // 成功後才存入本地並跳轉
+        localStorage.setItem('beacon_user_data', JSON.stringify(userData));
+        setGameState('result');
+    } catch (error) {
+        setFormError("提交失敗，請檢查網路或聯繫職員");
+    }
+};
+
+            return (
+                <div className="min-h-screen pb-20">
+                    <header className="bg-gradient-to-r from-pink-500 to-orange-400 text-white p-8 pb-16 rounded-b-[3rem] shadow-xl text-center relative z-20">
+                        <span className="text-5xl mb-2 inline-block animate-bounce">🐰</span>
+                        <h1 className="text-2xl font-black tracking-widest uppercase italic">RE:SEARCH 尋蛋大作戰</h1>
+                        <p className="text-pink-100 text-[10px] mt-1 font-bold tracking-widest uppercase opacity-80">YMCA of Hong Kong The Beacon</p>
+                    </header>
+
+                    <main className="max-w-md mx-auto p-5 mt-1 relative z-30">
+                        {/* 1. 任務清單首頁 */}
+                        {gameState === 'list' && (
+                            <div className="space-y-6 animate-in">
+                                <div className="bg-white/95 backdrop-blur-md p-6 rounded-[2.5rem] border border-white text-center shadow-lg -mt-10">
+                                    <p className="text-slate-400 font-black text-[10px] uppercase tracking-widest mb-1 italic">剩餘可用錦囊</p>
+                                    <p className="text-[9px] text-slate-400 font-bold mb-4 italic opacity-80">每個錦囊可在挑戰中使用一次</p>
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div className={`p-6 rounded-3xl flex flex-col items-center justify-center transition-all ${powerUps.used5050 ? 'bg-gray-50 opacity-40' : 'bg-blue-50 border-2 border-blue-100 shadow-sm'}`}>
+                                            <span className={`text-3xl font-black ${powerUps.used5050 ? 'text-gray-400' : 'text-blue-600'}`}>50/50</span>
+                                        </div>
+                                        <div className={`p-6 rounded-3xl flex flex-col items-center justify-center transition-all ${powerUps.usedHint ? 'bg-gray-50 opacity-40' : 'bg-purple-50 border-2 border-purple-100 shadow-sm'}`}>
+                                            <span className={`text-2xl font-black ${powerUps.usedHint ? 'text-gray-400' : 'text-purple-600'}`}>參考提示</span>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <button onClick={() => setGameState('scan')} className="w-full bg-yellow-400 p-6 rounded-3xl font-black text-xl text-yellow-900 shadow-[0_8px_0_rgb(217,119,6)] active:translate-y-1 active:shadow-none flex flex-col items-center justify-center gap-1">
+                                    <div className="flex items-center gap-3">
+                                        <i data-lucide="scan" className="w-6 h-6"></i>
+                                        <span>掃描 QR 碼 / 輸入代碼</span>
+                                    </div>
+                                </button>
+
+                                <div className="grid gap-3">
+                                    {[1,2,3,4,5,6].map(id => (
+                                        <div key={id} className={`p-4 rounded-2xl border-2 flex items-center justify-between ${userAnswers[id] ? 'bg-green-50 border-green-200' : 'bg-white border-pink-100/50 shadow-sm'}`}>
+                                            <div className="flex items-center gap-3">
+                                                <div className={`w-10 h-10 rounded-full flex items-center justify-center font-black ${userAnswers[id] ? 'bg-green-400 text-white' : 'bg-pink-100 text-pink-400'}`}>{id}</div>
+                                                <p className={`font-bold text-sm ${userAnswers[id] ? 'text-green-600 italic' : 'text-slate-400'}`}>
+                                                    {userAnswers[id] ? '成功尋蛋' : '待解鎖任務'}
+                                                </p>
+                                            </div>
+                                            {userAnswers[id] && <i data-lucide="check-circle-2" className="text-green-500 w-5 h-5"></i>}
+                                        </div>
+                                    ))}
+                                </div>
+
+                                <button onClick={() => setGameState('registration')} disabled={Object.keys(userAnswers).length < 6} className={`w-full py-5 rounded-2xl font-black text-lg shadow-lg ${Object.keys(userAnswers).length === 6 ? 'bg-pink-500 text-white shadow-pink-200 scale-105' : 'bg-slate-200 text-slate-400 opacity-50 cursor-not-allowed'}`}>
+                                    換領禮品 ({Object.keys(userAnswers).length}/6)
+                                </button>
+                            </div>
+                        )}
+
+                        {/* 2. 掃描/輸入頁面 */}
+                        {gameState === 'scan' && (
+                            <div className="space-y-4 animate-in -mt-10">
+                                <div className="bg-white p-5 rounded-[2.5rem] shadow-xl border-2 border-pink-100 min-h-[300px] flex flex-col items-center justify-center overflow-hidden">
+                                    {!isScanning ? (
+                                        <button onClick={() => setIsScanning(true)} className="flex flex-col items-center">
+                                            <div className="w-20 h-20 bg-pink-50 rounded-full flex items-center justify-center mb-4 transition-transform active:scale-95">
+                                                <i data-lucide="camera" className="w-10 h-10 text-pink-400"></i>
+                                            </div>
+                                            <p className="font-black text-slate-400 text-xs uppercase tracking-widest">啟動掃描器</p>
+                                        </button>
+                                    ) : (
+                                        <div className="w-full flex flex-col items-center">
+                                            <div id="qr-reader" className="w-full max-w-[280px] aspect-square rounded-3xl overflow-hidden border-4 border-white shadow-inner bg-black"></div>
+                                            <button onClick={() => setIsScanning(false)} className="mt-4 w-full text-red-400 font-black text-[10px] uppercase tracking-widest">暫停相機</button>
+                                        </div>
+                                    )}
+                                </div>
+                                <div className="bg-white p-8 rounded-[2.5rem] border-2 border-pink-100 shadow-md">
+                                    <h3 className="font-black text-pink-600 mb-4 text-sm tracking-widest text-center uppercase">或 手動輸入代碼</h3>
+                                    <div className="flex gap-3">
+                                        <div className="flex-[2] min-w-0">
+                                            <input type="text" maxLength="4" value={manualCode} onChange={e => {setManualCode(e.target.value.toUpperCase()); setManualCodeError('');}} className="w-full bg-pink-50 border-2 border-pink-100 rounded-2xl py-4 text-center font-black text-3xl shadow-inner outline-none focus:border-pink-300" placeholder="XXXX" />
+                                        </div>
+                                        <button onClick={() => handleCodeSuccess(manualCode)} className="flex-1 bg-pink-500 text-white rounded-2xl font-black shadow-lg active:scale-95 px-4 transition-transform">確認</button>
+                                    </div>
+                                    {manualCodeError && <p className="text-red-500 font-bold text-xs mt-3 text-center">{manualCodeError}</p>}
+                                </div>
+                                <button onClick={() => setGameState('list')} className="w-full text-pink-400 font-black text-xs uppercase tracking-widest py-4 flex items-center justify-center"><i data-lucide="arrow-left" className="w-4 h-4 mr-2"></i> 返回清單</button>
+                            </div>
+                        )}
+
+                        {/* 3. 答題頁面 */}
+                        {gameState === 'quiz' && activeTaskId && (
+                            <div className="space-y-4 animate-in -mt-10">
+                                <div className="bg-white p-8 rounded-[3rem] shadow-2xl border-t-[14px] border-yellow-400">
+                                    {feedback === 'success' ? (
+                                        <div className="py-6 text-center animate-in">
+                                            <div className="text-7xl mb-6">✨</div>
+                                            <h2 className="text-3xl font-black text-green-500 mb-6 italic">答啱咗！</h2>
+                                            <div className="bg-green-50 p-6 rounded-3xl text-left border-2 border-green-100 mb-8">
+                                                <p className="text-slate-700 font-bold leading-relaxed text-sm">{taskData[activeTaskId].explanation}</p>
+                                            </div>
+                                            <button onClick={handleExplanationConfirm} className="w-full bg-green-500 text-white py-5 rounded-2xl font-black text-xl shadow-lg active:translate-y-1">下一步</button>
+                                        </div>
+                                    ) : feedback === 'error' ? (
+                                        <div className="py-6 text-center animate-in">
+                                            <div className="text-7xl mb-4">🥺</div>
+                                            <p className="text-2xl font-black text-red-500 mb-4 italic">機會已用完</p>
+                                            <div className="bg-red-50 p-4 rounded-2xl mb-8">
+                                                <p className="text-sm font-bold text-slate-600 leading-relaxed px-4">請到 <span className="text-pink-600 underline">LG/F 詢問處</span><br/>由職員為你解鎖</p>
+                                            </div>
+                                            <div className="space-y-4 pt-6 border-t border-red-50">
+                                                <p className="text-[10px] text-slate-400 font-black uppercase tracking-widest italic">職員專用</p>
+                                                <input type="password" value={staffCodeInput} onChange={e => {setStaffCodeInput(e.target.value); setStaffError('');}} className="w-full p-4 rounded-2xl border-2 border-pink-100 text-center font-mono text-xl tracking-[0.4em]" placeholder="••••••" />
+                                                <button onClick={handleStaffUnlock} className="w-full bg-slate-800 text-white py-4 rounded-2xl font-black shadow-lg">確認解鎖</button>
+                                                {staffError && <p className="text-xs text-red-500 font-black mt-1">{staffError}</p>}
+                                            </div>
+                                        </div>
+                                    ) : cooldown > 0 ? (
+                                        <div className="py-20 text-center space-y-6">
+                                            <div className="text-8xl font-black text-pink-500 tabular-nums">{cooldown}</div>
+                                            <p className="font-black text-slate-600 text-3xl tracking-tight">Oops 諗清楚再試多次</p>
+                                        </div>
+                                    ) : (
+                                        <div className="space-y-6">
+                                            <div className="text-center mb-6">
+                                                <span className="text-[10px] font-black bg-yellow-100 text-yellow-700 px-4 py-1.5 rounded-full uppercase tracking-widest italic">MISSION 0{activeTaskId}</span>
+                                                <h2 className="text-lg font-bold text-slate-700 mt-4 leading-relaxed">{taskData[activeTaskId].question}</h2>
+                                            </div>
+                                            <div className="grid gap-4">
+                                                {Object.entries(taskData[activeTaskId].options).map(([key, text]) => {
+                                                    const isWrongClicked = wrongOptions.includes(key);
+                                                    const isHiddenBy5050 = active5050.includes(key);
+                                                    return (
+                                                        <button 
+                                                            key={key} 
+                                                            disabled={isWrongClicked || isHiddenBy5050} 
+                                                            onClick={() => handleAnswer(key)} 
+                                                            className={`p-5 rounded-2xl border-2 text-left flex items-start gap-4 transition-all ${isHiddenBy5050 ? 'opacity-0 pointer-events-none' : isWrongClicked ? 'bg-gray-50 border-gray-100 text-gray-300' : 'bg-white border-yellow-200 text-slate-700 shadow-md active:translate-y-1'}`}
+                                                        >
+                                                            <span className={`w-8 h-8 rounded-full flex-shrink-0 flex items-center justify-center font-black transition-colors ${isWrongClicked ? 'bg-gray-200 text-gray-400' : 'bg-yellow-400 text-yellow-900'}`}>
+                                                                {key}
+                                                            </span>
+                                                            <span className="font-bold text-sm pt-1">{text}</span>
+                                                        </button>
+                                                    );
+                                                })}
+                                            </div>
+                                            
+                                            <div className="mt-8 p-6 border-2 border-slate-50 rounded-[2.5rem] bg-slate-50/30 text-center">
+                                                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4 italic">輔助道具</p>
+                                                <div className="flex gap-4">
+                                                    <button onClick={() => {
+                                                        const correct = taskData[activeTaskId].correct;
+                                                        const wrong = Object.keys(taskData[activeTaskId].options).filter(k => k !== correct && !wrongOptions.includes(k)).sort(() => 0.5 - Math.random()).slice(0, 2);
+                                                        setActive5050(wrong); setPowerUps({...powerUps, used5050: true});
+                                                    }} disabled={powerUps.used5050} className={`flex-1 p-5 rounded-2xl border-2 flex flex-col items-center justify-center transition-all ${powerUps.used5050 ? 'bg-gray-50 text-gray-300' : 'bg-blue-50 border-blue-200 text-blue-600 shadow-sm active:scale-95'}`}>
+                                                        <span className="text-2xl font-black">50/50</span>
+                                                    </button>
+                                                    <button onClick={() => { setShowHintModal(true); setPowerUps({...powerUps, usedHint: true}); }} disabled={powerUps.usedHint} className={`flex-1 p-5 rounded-2xl border-2 flex flex-col items-center justify-center transition-all ${powerUps.usedHint ? 'bg-gray-50 text-gray-300' : 'bg-purple-50 border-purple-200 text-purple-600 shadow-sm active:scale-95'}`}>
+                                                        <span className="text-xl font-black">參考提示</span>
+                                                    </button>
+                                                </div>
+                                            </div>
+                                            <button onClick={() => setGameState('list')} className="w-full text-slate-400 font-black text-[10px] mt-4 uppercase tracking-[0.3em]">暫時離開</button>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                        )}
+
+                        {/* 4. 登記領獎 */}
+                        {gameState === 'registration' && (
+                            <div className="bg-white p-8 rounded-[3rem] shadow-xl border-2 border-pink-100 animate-in -mt-10">
+                                <div className="text-center mb-8">
+                                    <div className="inline-block p-5 bg-green-100 rounded-full mb-4 animate-bounce">
+                                        <i data-lucide="trophy" className="w-10 h-10 text-green-600"></i>
+                                    </div>
+                                    <h2 className="text-2xl font-black text-pink-600 italic">挑戰大成功！</h2>
+                                    <p className="text-slate-500 font-bold text-sm mt-2">請登記資料以換領獎品</p>
+                                </div>
+                                <form onSubmit={handleFinalRegistration} className="space-y-6">
+                                    <input type="text" value={userData.name} onChange={e => setUserData({...userData, name: e.target.value})} placeholder="參加者姓名 *" className="w-full bg-slate-50 border-2 border-slate-100 rounded-2xl px-6 py-4 outline-none font-bold text-lg focus:border-pink-300 focus:bg-white shadow-inner" />
+                                    <div className="p-6 bg-orange-50/50 rounded-3xl border-2 border-orange-100 space-y-4">
+                                        <select value={contactMethod} onChange={(e) => setContactMethod(e.target.value)} className="w-full bg-white border-2 border-slate-200 rounded-xl px-4 py-3 font-bold text-sm">
+                                            <option value="email">電郵地址 (Email)</option>
+                                            <option value="whatsapp">WhatsApp 號碼</option>
+                                        </select>
+                                        {contactMethod === 'email' ? (
+                                            <input type="email" value={userData.email || ''} onChange={e => setUserData({...userData, email: e.target.value})} placeholder="example@mail.com" className="w-full bg-white border-2 border-slate-200 rounded-xl px-4 py-3 font-bold text-sm" />
+                                        ) : (
+                                            <input type="tel" maxLength="8" value={userData.whatsapp || ''} onChange={e => setUserData({...userData, whatsapp: e.target.value.replace(/\D/g, '')})} placeholder="8位電話號碼" className="w-full bg-white border-2 border-slate-200 rounded-xl px-4 py-3 font-bold text-sm" />
+                                        )}
+                                    </div>
+
+                                    <label className="flex items-start gap-4 bg-slate-50 p-4 rounded-2xl border border-slate-100 cursor-pointer">
+                                        <input type="checkbox" checked={userData.agreed || false} onChange={e => setUserData({...userData, agreed: e.target.checked})} className="mt-1 w-6 h-6 rounded-lg accent-pink-500" />
+                                        <span className="text-[11px] text-slate-500 font-bold leading-relaxed">
+                                            本人同意 YMCAHK The Beacon 使用上述資料作課程、活動及服務推廣及宣傳用途。 *
+                                        </span>
+                                    </label>
+
+                                    {formError && <p className="text-red-500 text-xs font-black text-center">{formError}</p>}
+                                    <button type="submit" className="w-full bg-pink-500 text-white py-5 rounded-2xl font-black text-xl shadow-xl active:translate-y-1">提交登記</button>
+                                </form>
+                            </div>
+                        )}
+
+                        {/* 5. 最終兌換 */}
+                        {gameState === 'result' && (
+                            <div className="bg-white p-8 rounded-[3.5rem] shadow-2xl border-4 border-pink-400 text-center animate-in relative overflow-hidden -mt-10">
+                                <i data-lucide="sparkles" className="w-16 h-16 mx-auto text-yellow-400 mb-4"></i>
+                                <h2 className="text-2xl font-black text-slate-800 italic">恭喜你！{userData.name}</h2>
+                                
+                                <div className="my-8 bg-slate-900 p-8 rounded-[2.5rem] text-white shadow-2xl relative">
+                                    <p className="text-[10px] text-yellow-300 mb-3 font-black tracking-[0.4em] uppercase opacity-80">換領代碼</p>
+                                    <p className="text-5xl font-mono font-black tracking-widest tabular-nums">{uniqueId}</p>
+                                    
+                                    <div className="mt-8 pt-6 border-t border-white/20">
+                                        <div className="flex items-center justify-center gap-2 mb-2">
+                                            <div className="w-2.5 h-2.5 rounded-full bg-red-500 animate-pulse"></div>
+                                            <span className="text-[10px] font-black uppercase tracking-[0.3em] text-white/40 italic">Live Security Time</span>
+                                        </div>
+                                        <p className="text-4xl font-mono font-black tabular-nums tracking-tighter">
+                                            {currentTime.toLocaleTimeString([], { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+                                        </p>
+                                    </div>
+                                </div>
+                                
+                                <div className="bg-orange-50 p-6 rounded-3xl border-2 border-orange-100 mb-6">
+                                    <p className="text-sm font-black text-orange-700 leading-relaxed italic">
+                                        請到 <span className="text-pink-600 underline font-black">LG/F 詢問處</span> 出示此畫面<br/>領取禮物一份！🎁
+                                    </p>
+                                </div>
+                                
+                                <p className="text-[9px] text-slate-400 font-bold uppercase tracking-widest">
+                                    注意：截圖無效 · 請保持此畫面開啟
+                                </p>
+                                <button onClick={() => { localStorage.clear(); window.location.reload(); }} className="text-slate-200 text-[8px] mt-8 uppercase tracking-tighter">系統重置</button>
+                            </div>
+                        )}
+
+                        {showHintModal && (
+                            <div className="fixed inset-0 z-50 flex items-center justify-center p-6 bg-slate-900/80 backdrop-blur-md animate-in">
+                                <div className="bg-white w-full max-w-xs rounded-[3rem] p-10 text-center shadow-2xl relative border-b-8 border-purple-500">
+                                    <div className="w-20 h-20 bg-purple-50 rounded-full flex items-center justify-center mx-auto mb-6">
+                                        <i data-lucide="lightbulb" className="w-10 h-10 text-purple-500"></i>
+                                    </div>
+                                    <h4 className="text-2xl font-black text-purple-600 mb-4 tracking-wider italic">參考提示</h4>
+                                    <p className="text-slate-600 font-bold leading-loose text-sm italic">{taskData[activeTaskId]?.hint}</p>
+                                    <button onClick={() => setShowHintModal(false)} className="mt-10 w-full bg-purple-500 text-white py-4 rounded-2xl font-black shadow-lg active:translate-y-1">明白晒！</button>
+                                </div>
+                            </div>
+                        )}
+                    </main>
+
+                    <footer className="fixed bottom-0 left-0 w-full text-center p-3 bg-white/60 backdrop-blur-md z-10 border-t border-white/50">
+                        <p className="text-[8px] text-slate-400 font-black uppercase tracking-[0.2em] italic">© YMCAHK THE BEACON · QUEST ENGINE V2.5</p>
+                    </footer>
+                </div>
+            );
+        };
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>

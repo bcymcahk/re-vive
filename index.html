@@ -128,25 +128,25 @@
                 return saved ? JSON.parse(saved) : { name: '', email: '', whatsapp: '', agreed: false };
             });
             const [contactMethod, setContactMethod] = useState('email');
-            const [userAnswers, setUserAnswers] = useState(() => JSON.parse(localStorage.getItem('beacon_answers')) || {});
-            const [powerUps, setPowerUps] = useState(() => JSON.parse(localStorage.getItem('beacon_powerups')) || { used5050: false, usedHint: false });
-            const [active5050, setActive5050] = useState([]); 
+            const[userAnswers, setUserAnswers] = useState(() => JSON.parse(localStorage.getItem('beacon_answers')) || {});
+            const[powerUps, setPowerUps] = useState(() => JSON.parse(localStorage.getItem('beacon_powerups')) || { used5050: false, usedHint: false });
+            const[active5050, setActive5050] = useState([]); 
             const [showHintModal, setShowHintModal] = useState(false);
             const [activeTaskId, setActiveTaskId] = useState(null);
-            const [manualCode, setManualCode] = useState('');
+            const[manualCode, setManualCode] = useState('');
             const [manualCodeError, setManualCodeError] = useState('');
             const [uniqueId, setUniqueId] = useState('');
-            const [formError, setFormError] = useState('');
+            const[formError, setFormError] = useState('');
             const [currentTime, setCurrentTime] = useState(new Date());
             
             const [feedback, setFeedback] = useState(null); 
             const [cooldown, setCooldown] = useState(0);
             const [wrongOptions, setWrongOptions] = useState([]);
-            const [attempts, setAttempts] = useState(() => JSON.parse(localStorage.getItem('beacon_attempts')) || {});
+            const[attempts, setAttempts] = useState(() => JSON.parse(localStorage.getItem('beacon_attempts')) || {});
             const [staffCodeInput, setStaffCodeInput] = useState('');
             const [staffError, setStaffError] = useState('');
             const [isScanning, setIsScanning] = useState(false);
-            const [cameraError, setCameraError] = useState(null);
+            const[cameraError, setCameraError] = useState(null);
             const scannerRef = useRef(null);
 
             useEffect(() => {
@@ -159,12 +159,12 @@
                 if (userData.agreed && userData.name && Object.keys(userAnswers).length === 6) {
                     setGameState('result');
                 }
-            }, []);
+            },[]);
 
             useEffect(() => {
                 const timer = setInterval(() => setCurrentTime(new Date()), 1000);
                 return () => clearInterval(timer);
-            }, []);
+            },[]);
 
             useEffect(() => {
                 if (window.lucide) window.lucide.createIcons();
@@ -269,41 +269,41 @@
                 }
             };
 
-const handleFinalRegistration = async (e) => {
-    e.preventDefault();
-    setFormError('');
-    
-    // 驗證邏輯 (保留你原本的)
-    if (!userData.name.trim()) { setFormError("請輸入姓名"); return; }
-    let contactValue = contactMethod === 'email' ? userData.email : userData.whatsapp;
-    if (contactMethod === 'email' && (!userData.email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(userData.email))) { setFormError("請輸入有效電郵"); return; }
-    if (contactMethod === 'whatsapp' && (!userData.whatsapp || userData.whatsapp.length < 8)) { setFormError("請輸入正確電話"); return; }
-    if (!userData.agreed) { setFormError("請同意條款"); return; }
+            const handleFinalRegistration = async (e) => {
+                e.preventDefault();
+                setFormError('');
+                
+                // 驗證邏輯
+                if (!userData.name.trim()) { setFormError("請輸入姓名"); return; }
+                let contactValue = contactMethod === 'email' ? userData.email : userData.whatsapp;
+                if (contactMethod === 'email' && (!userData.email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(userData.email))) { setFormError("請輸入有效電郵"); return; }
+                if (contactMethod === 'whatsapp' && (!userData.whatsapp || userData.whatsapp.length < 8)) { setFormError("請輸入正確電話"); return; }
+                if (!userData.agreed) { setFormError("請同意條款"); return; }
 
-    // --- 新增：傳送資料到 Google Sheet ---
-    const GOOGLE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbyS2APVR5UG7hlaGt3fMbKbc9TWavq2N4v5Nfmqfxi4YMEuUdYa3U0PDHO2iwte2tD3pA/exec'; 
+                const GOOGLE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbyS2APVR5UG7hlaGt3fMbKbc9TWavq2N4v5Nfmqfxi4YMEuUdYa3U0PDHO2iwte2tD3pA/exec'; 
 
-    try {
-        setGameState('loading'); // 你可以加一個加載狀態
-        await fetch(GOOGLE_SCRIPT_URL, {
-            method: 'POST',
-            mode: 'no-cors', // 重要：避免跨域報錯
-            cache: 'no-cache',
-            body: JSON.stringify({
-                uniqueId: uniqueId,
-                name: userData.name,
-                contactMethod: contactMethod,
-                contactValue: contactValue
-            })
-        });
-        
-        // 成功後才存入本地並跳轉
-        localStorage.setItem('beacon_user_data', JSON.stringify(userData));
-        setGameState('result');
-    } catch (error) {
-        setFormError("提交失敗，請檢查網路或聯繫職員");
-    }
-};
+                try {
+                    setGameState('loading'); // 進入提交中狀態
+                    await fetch(GOOGLE_SCRIPT_URL, {
+                        method: 'POST',
+                        mode: 'no-cors',
+                        cache: 'no-cache',
+                        body: JSON.stringify({
+                            uniqueId: uniqueId,
+                            name: userData.name,
+                            contactMethod: contactMethod,
+                            contactValue: contactValue
+                        })
+                    });
+                    
+                    // 成功後才存入本地並跳轉
+                    localStorage.setItem('beacon_user_data', JSON.stringify(userData));
+                    setGameState('result');
+                } catch (error) {
+                    setGameState('registration'); // 發生錯誤時退回登記頁面，避免卡死
+                    setFormError("提交失敗，請檢查網路或聯繫職員");
+                }
+            };
 
             return (
                 <div className="min-h-screen pb-20">
@@ -503,6 +503,19 @@ const handleFinalRegistration = async (e) => {
                                     {formError && <p className="text-red-500 text-xs font-black text-center">{formError}</p>}
                                     <button type="submit" className="w-full bg-pink-500 text-white py-5 rounded-2xl font-black text-xl shadow-xl active:translate-y-1">提交登記</button>
                                 </form>
+                            </div>
+                        )}
+
+                        {/* 4.5 提交中 (載入畫面) */}
+                        {gameState === 'loading' && (
+                            <div className="bg-white p-10 rounded-[3rem] shadow-xl border-2 border-pink-100 animate-in -mt-10 text-center flex flex-col items-center justify-center min-h-[350px]">
+                                <div className="w-24 h-24 bg-pink-50 rounded-full flex items-center justify-center mb-6">
+                                    <i data-lucide="loader-2" className="w-12 h-12 text-pink-500 animate-spin"></i>
+                                </div>
+                                <h2 className="text-2xl font-black text-pink-600 italic mb-4">提交中...</h2>
+                                <div className="bg-orange-50 p-4 rounded-2xl border-2 border-orange-100">
+                                    <p className="text-sm font-bold text-orange-700">請勿離開本頁面</p>
+                                </div>
                             </div>
                         )}
 
